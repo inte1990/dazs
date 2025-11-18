@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>问问小猫 - 离线答案之书</title>
+    <!-- 引入SheetJS库用于解析Excel文件 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: radial-gradient(circle at center, #1a1a1a, #000);
+            transition: background 0.5s ease;
+        }
+        
+        .step {
+            max-width: 700px;
+            width: 100%;
+            text-align: center;
+            padding: 40px 30px;
+            border-radius: 20px;
+            background: rgba(20, 20, 20, 0.9);
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.2);
+            position: relative;
+            overflow: hidden;
+            display: none;
+        }
+        
+        .step.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .step::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            right: -10px;
+            bottom: -10px;
+            border: 2px solid transparent;
+            border-radius: 25px;
+            background: linear-gradient(45deg, #d4af37, #f7ef8a, #d4af37);
+            z-index: -1;
+            animation: borderGlow 3s linear infinite;
+        }
+        
+        @keyframes borderGlow {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #d4af37;
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+            letter-spacing: 2px;
+        }
+        
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: #d4af37;
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+        }
+        
+        .subtitle {
+            color: #aaa;
+            margin-bottom: 30px;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+        
+        .cat-icon {
+            width: 180px;
+            height: 180px;
+            margin: 30px auto;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 4px solid #d4af37;
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
+            animation: float 3s ease-in-out infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(40, 40, 40, 0.7);
+        }
+        
+        .cat-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0); }
+        }
+        
+        .file-upload {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #d4af37;
+            border-radius: 10px;
+            background: rgba(40, 40, 40, 0.5);
+        }
+        
+        .file-upload label {
+            display: block;
+            margin-bottom: 15px;
+            color: #d4af37;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        
+        .file-input {
+            width: 100%;
+            padding: 12px;
+            background: rgba(60, 60, 60, 0.7);
+            border: 1px solid #d4af37;
+            border-radius: 5px;
+            color: white;
+            margin-bottom: 15px;
+        }
+        
+        .file-input:focus {
+            outline: none;
+            box-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+        }
+        
+        .gold-button {
+            background: linear-gradient(145deg, #d4af37, #f7ef8a);
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(212, 175, 55, 0.4);
+            margin: 20px 0;
+            letter-spacing: 1px;
+            display: inline-block;
+        }
+        
+        .gold-button:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(212, 175, 55, 0.6);
+        }
+        
+        .gold-button:active {
+            transform: translateY(1px);
+        }
+        
+        .gold-button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .answer-container {
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 30px 0;
+            padding: 30px;
+            border-radius: 15px;
+            background: rgba(40, 40, 40, 0.7);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            transition: all 0.5s ease;
+        }
+        
+        .answer-text {
+            font-size: 1.6rem;
+            line-height: 1.8;
+            margin-bottom: 20px;
+            font-style: italic;
+            color: #f0f0f0;
+            text-align: center;
+        }
+        
+        .song-info {
+            color: #d4af37;
+            font-size: 1.2rem;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(212, 175, 55, 0.3);
+            width: 100%;
+            text-align: center;
+        }
+        
+        .status-message {
+            margin: 15px 0;
+            padding: 12px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+        
+        .success {
+            background: rgba(0, 128, 0, 0.2);
+            color: #4CAF50;
+            border: 1px solid #4CAF50;
+        }
+        
+        .error {
+            background: rgba(255, 0, 0, 0.2);
+            color: #f44336;
+            border: 1px solid #f44336;
+        }
+        
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .step-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #444;
+            margin: 0 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .step-dot.active {
+            background: #d4af37;
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.7);
+        }
+        
+        .footer {
+            margin-top: 30px;
+            color: #666;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+        
+        @media (max-width: 600px) {
+            .step {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            h2 {
+                font-size: 1.6rem;
+            }
+            
+            .answer-text {
+                font-size: 1.3rem;
+            }
+            
+            .cat-icon {
+                width: 140px;
+                height: 140px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 步骤指示器 -->
+    <div class="step-indicator">
+        <div class="step-dot" id="step1Dot"></div>
+        <div class="step-dot" id="step2Dot"></div>
+        <div class="step-dot" id="step3Dot"></div>
+    </div>
+    
+    <!-- 第一步：上传Excel文件 -->
+    <div class="step active" id="step1">
+        <p class="subtitle">请上传文件，我们将从中随机选择答案</p>
+        
+        <div class="file-upload">
+            <label for="excelFile">选择Excel文件 (.xlsx 或 .xls)</label>
+            <input type="file" id="excelFile" class="file-input" accept=".xlsx, .xls">
+            <div id="fileStatus" class="status-message"></div>
+        </div>
+        
+        <button class="gold-button" id="nextStep1" disabled>下一步</button>
+        
+        <div class="footer">
+            确保Excel文件包含"歌词"、"剧目"和"歌名"列
+        </div>
+    </div>
+    
+    <!-- 第二步：封面页面 -->
+    <div class="step" id="step2">
+        <h1>猫知道一切答案</h1>
+        <div class="cat-icon">
+            <img src="cat1.png" alt="小猫头像" id="catImage">
+        </div>
+        <p class="subtitle">准备好获取答案了吗？点击下方按钮向小猫提问</p>
+        
+        <button class="gold-button" id="askButton">问问小猫</button>
+        
+        <div class="footer">
+            点击按钮随机获取一条歌词作为答案
+        </div>
+    </div>
+    
+    <!-- 第三步：答案页面 -->
+    <div class="step" id="step3">
+        <div class="cat-icon">
+            <img src="cat2.png" alt="小猫头像" id="catImage2">
+        </div>
+        
+        <div class="answer-container">
+            <div class="answer-text" id="answerText">点击"问问小猫"按钮获取答案</div>
+            <div class="song-info" id="songInfo"></div>
+        </div>
+        
+        <button class="gold-button" id="askAgainButton">再问一次</button>
+        
+        <div class="footer">
+            每次点击都会随机选择一条新的歌词
+        </div>
+    </div>
+
+    <script>
+        // DOM元素
+        const step1 = document.getElementById('step1');
+        const step2 = document.getElementById('step2');
+        const step3 = document.getElementById('step3');
+        const step1Dot = document.getElementById('step1Dot');
+        const step2Dot = document.getElementById('step2Dot');
+        const step3Dot = document.getElementById('step3Dot');
+        
+        const excelFileInput = document.getElementById('excelFile');
+        const nextStep1Button = document.getElementById('nextStep1');
+        const askButton = document.getElementById('askButton');
+        const askAgainButton = document.getElementById('askAgainButton');
+        const answerText = document.getElementById('answerText');
+        const songInfo = document.getElementById('songInfo');
+        const fileStatus = document.getElementById('fileStatus');
+        const catImage = document.getElementById('catImage');
+        const catImage2 = document.getElementById('catImage2');
+
+        // 存储歌词数据
+        let lyricsData = [];
+
+        // 步骤管理
+        function goToStep(stepNumber) {
+            // 隐藏所有步骤
+            step1.classList.remove('active');
+            step2.classList.remove('active');
+            step3.classList.remove('active');
+            step1Dot.classList.remove('active');
+            step2Dot.classList.remove('active');
+            step3Dot.classList.remove('active');
+            
+            // 显示指定步骤
+            if (stepNumber === 1) {
+                step1.classList.add('active');
+                step1Dot.classList.add('active');
+            } else if (stepNumber === 2) {
+                step2.classList.add('active');
+                step2Dot.classList.add('active');
+            } else if (stepNumber === 3) {
+                step3.classList.add('active');
+                step3Dot.classList.add('active');
+            }
+        }
+
+        // 处理文件上传
+        excelFileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            fileStatus.textContent = "正在读取文件...";
+            fileStatus.className = "status-message";
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // 获取第一个工作表
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    
+                    // 将工作表转换为JSON
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                    
+                    if (jsonData.length === 0) {
+                        fileStatus.textContent = "Excel文件中没有数据";
+                        fileStatus.className = "status-message error";
+                        nextStep1Button.disabled = true;
+                        return;
+                    }
+                    
+                    // 检查必要的列是否存在
+                    const firstRow = jsonData[0];
+                    const hasLyric = '歌词' in firstRow;
+                    const hasSong = '剧目' in firstRow;
+                    const hasArtist = '歌名' in firstRow;
+                    
+                    if (!hasLyric || !hasSong || !hasArtist) {
+                        fileStatus.textContent = "Excel文件必须包含'歌词'、'剧目'和'歌名'列";
+                        fileStatus.className = "status-message error";
+                        nextStep1Button.disabled = true;
+                        return;
+                    }
+                    
+                    // 存储数据
+                    lyricsData = jsonData;
+                    
+                    fileStatus.textContent = `成功加载 ${lyricsData.length} 条歌词`;
+                    fileStatus.className = "status-message success";
+                    
+                    // 启用下一步按钮
+                    nextStep1Button.disabled = false;
+                    
+                } catch (error) {
+                    console.error("解析Excel文件时出错:", error);
+                    fileStatus.textContent = "无法解析Excel文件，请检查文件格式";
+                    fileStatus.className = "status-message error";
+                    nextStep1Button.disabled = true;
+                }
+            };
+            
+            reader.onerror = function() {
+                fileStatus.textContent = "读取文件时出错";
+                fileStatus.className = "status-message error";
+                nextStep1Button.disabled = true;
+            };
+            
+            reader.readAsArrayBuffer(file);
+        });
+
+        // 随机获取歌词
+        function getRandomLyric() {
+            if (lyricsData.length === 0) return null;
+            const randomIndex = Math.floor(Math.random() * lyricsData.length);
+            return lyricsData[randomIndex];
+        }
+
+        // 显示答案
+        function showAnswer() {
+            const lyric = getRandomLyric();
+            if (!lyric) {
+                answerText.textContent = "没有可用的歌词数据";
+                songInfo.textContent = "";
+                return;
+            }
+            
+            answerText.textContent = lyric.歌词 || "无歌词内容";
+            songInfo.textContent = `${lyric.剧目 || "未知剧目"} - ${lyric.歌名 || "未知歌名"}`;
+        }
+
+        // 处理图片加载错误
+        catImage.onerror = function() {
+            console.error("无法加载小猫图片，请确保cat.png文件存在");
+            catImage.alt = "小猫图片加载失败";
+            catImage.style.display = 'none';
+            // 显示备用图标
+            const fallbackIcon = document.createElement('div');
+            fallbackIcon.textContent = '🐱';
+            fallbackIcon.style.fontSize = '5rem';
+            catImage.parentNode.appendChild(fallbackIcon);
+        };
+        
+        catImage2.onerror = function() {
+            console.error("无法加载小猫图片，请确保cat.png文件存在");
+            catImage2.alt = "小猫图片加载失败";
+            catImage2.style.display = 'none';
+            // 显示备用图标
+            const fallbackIcon = document.createElement('div');
+            fallbackIcon.textContent = '🐱';
+            fallbackIcon.style.fontSize = '5rem';
+            catImage2.parentNode.appendChild(fallbackIcon);
+        };
+
+        // 事件监听
+        nextStep1Button.addEventListener('click', () => goToStep(2));
+        askButton.addEventListener('click', () => {
+            showAnswer();
+            goToStep(3);
+        });
+        askAgainButton.addEventListener('click', () => goToStep(2));
+
+        // 初始化
+        window.addEventListener('load', () => {
+            goToStep(1);
+        });
+    </script>
+</body>
+</html>
